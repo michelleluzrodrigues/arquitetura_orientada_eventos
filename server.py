@@ -13,32 +13,33 @@ class ServerState(Enum):
 @Pyro5.api.expose
 class RaftServer:
     def __init__(self, server_id, peers, port):
-        self.server_id = server_id
-        self.state = ServerState.FOLLOWER
-        self.peers = peers
-        self.port = port
-        self.current_term = 0
+        self.server_id = server_id # Identificador único do servidor
+        self.state = ServerState.FOLLOWER # Estado inicial como FOLLOWER
+        self.peers = peers # Lista de outros servidores (peers)
+        self.port = port # Porta para comunicação
+        self.current_term = 0 # Termo atual (ciclo de eleição)
         self.voted_for = None
-        self.log = []
-        self.last_command = None
+        self.log = [] # Log de comandos
+        self.last_command = None # Último comando processado
         # self.commit_index = 0
         # self.last_applied = 0
-        self.leader_id = None
-        proxy = Pyro5.api.locate_ns()
+        self.leader_id = None # ID do líder atual
+        proxy = Pyro5.api.locate_ns() # Localiza o serviço de nomes
 
-        # Daemon and URI registration
+        # Configuração do Pyro Daemon e registro no serviço de nomes
         self.daemon = Pyro5.api.Daemon(host="localhost", port=port)
         self.uri = self.daemon.register(self, objectId=f"server{server_id}")
         proxy.register(f"server{server_id}", self.uri)
 
-        # Timers
+        # Configuração de timers para eleição e heartbeat
         self.election_timeout = random.uniform(5, 10)
         self.heartbeat_interval = 2
         self.election_timer = threading.Timer(self.election_timeout, self.start_election)
         self.heartbeat_timer = threading.Timer(self.heartbeat_interval, self.send_heartbeat)
 
         self.running = True
-
+        
+    # método para verificar se o servidor está ativo.
     def ping(self):
         return True
 
@@ -72,6 +73,7 @@ class RaftServer:
 
             self.reset_election_timer()
 
+    # Registra o servidor como líder no serviço de nomes.
     def register_leader(self):
         # Atualiza ou registra o servidor como líder no serviço de nomes
         leader_name = f"Líder_Termo{self.current_term}"
@@ -85,6 +87,7 @@ class RaftServer:
         proxy.register(leader_name, self.uri)
         print(f"Registrado como {leader_name} no serviço de nomes")
 
+    # Envia sinais de heartbeat aos pares para manter a autoridade como líder
     def send_heartbeat(self):
         if self.state == ServerState.LEADER:
             for peer_uri in self.peers:
@@ -95,6 +98,7 @@ class RaftServer:
                     print(f"Failed to communicate with peer {peer_uri}: {e}")
         self.reset_heartbeat_timer()
 
+    #Recebe sinais de heartbeat de um líder e reseta o timer de eleição.
     def request_hearbeat(self, leader_id, term):
         if self.leader_id != leader_id:
             self.leader_id = leader_id
@@ -105,6 +109,7 @@ class RaftServer:
         if term >= self.current_term:
             self.current_term = term
 
+    # Avalia uma solicitação de voto de outro servidor e decide se deve votar com base no termo e no log.
     def request_vote(self, candidate_id, term):
         if term > self.current_term and (self.voted_for is None or self.voted_for == candidate_id):
             self.voted_for = candidate_id
@@ -113,6 +118,7 @@ class RaftServer:
             return True
         return False
 
+    # Processa um comando se o servidor for o líder, tentando replicá-lo nos pares.
     def process_command(self, command):
         if self.state == ServerState.LEADER:
             print(f"Leader {self.server_id} received command: {command}")
@@ -135,34 +141,40 @@ class RaftServer:
                         peer.commit_log()
                     except Pyro5.errors.CommunicationError as e:
                         print(f"Failed to communicate with peer {peer_uri}: {e}")
-
+                        
+    # Adiciona um comando ao log se o comando for de um líder reconhecido.
     def append_log(self, leader_id, command):
         if leader_id == self.leader_id:
             self.last_command = command
             return True
         return False
 
+    # Confirma os comandos no log local após a replicação bem-sucedida.
     def commit_log(self):
         if self.last_command is not None:
             self.log.append(self.last_command)
             self.last_command = None
             print(f"Server {self.server_id} log: {self.log}")
 
+    # Reseta o timer de eleição para prevenir a ocorrência de eleições frequentes.
     def reset_election_timer(self):
         self.election_timer.cancel()
         self.election_timer = threading.Timer(random.uniform(5, 10), self.start_election)
         self.election_timer.start()
 
+    # Reseta o timer de heartbeat para manter a regularidade dos envios.
     def reset_heartbeat_timer(self):
         self.heartbeat_timer.cancel()
         self.heartbeat_timer = threading.Timer(self.heartbeat_interval, self.send_heartbeat)
         self.heartbeat_timer.start()
 
+    # nicia o loop principal do servidor, mantendo-o rodando.
     def run(self):
         self.election_timer.start()
         while self.running:
             self.daemon.requestLoop(lambda: self.running)
 
+    # Para o servidor, cancelando timers e encerrando o daemon.
     def stop(self):
         self.running = False  # Seta o sinalizador para parar o loop e os timers
         self.election_timer.cancel()
