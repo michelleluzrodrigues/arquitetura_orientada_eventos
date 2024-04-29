@@ -10,25 +10,25 @@ Este projeto implementa um sistema de servidores distribuídos usando o módulo 
 ## Configuração do Ambiente
 Para instalar as dependências necessárias, execute o seguinte comando:
 
-bash
+```bash
 pip install Pyro5
-
+```
 
 ## Inicialização do Projeto
 Iniciar o Servidor de Nomes
 Abra um terminal e execute o servidor de nomes Pyro5:
 
 
-bash
+```bash
 python -m Pyro5.nameserver
-
+```
 
 ## Iniciar os Servidores
 Em um novo terminal, navegue até o diretório do projeto e execute o seguinte comando para iniciar os servidores:
 
-bash
+```bash
 python main.py
-
+```
 
 Este script inicializará quatro servidores que participarão na eleição de um líder usando o algoritmo de Raft.  
 Neste terminal sera exibidos os logs de execução dos servidores.
@@ -36,13 +36,13 @@ Neste terminal sera exibidos os logs de execução dos servidores.
 ## Cliente
 O cliente pode ser executado interativamente para testar a funcionalidade do sistema. Para isso, você pode usar um terminal interativo de Python:
 
-bash
+```bash
 python
-
+```
 
 Dentro do ambiente interativo, você pode criar uma instância do cliente e usar os métodos para enviar comandos ou simular falhas:
 
-python
+```python
 from client import RaftClient
 
 # Cria uma instância do cliente
@@ -53,7 +53,7 @@ cliente.send_command("Nova entrada de log")
 
 # Simula a falha do líder
 cliente.stop_leader()
-
+```
 
 ## Funcionamento do Sistema
 - Os servidores utilizam o algoritmo de Raft para eleger um líder.
