@@ -46,10 +46,10 @@ class RaftServer:
     def start_election(self):
         if self.state != ServerState.LEADER:
             self.state = ServerState.CANDIDATE
-            self.current_term += 1
-            self.voted_for = self.server_id
-            vote_count = 1
-            total_votes = 1
+            self.current_term += 1 
+            self.voted_for = self.server_id # registra voto para si mesmo
+            vote_count = 1 
+            total_votes = 1 
 
             print(f"Server {self.server_id} starting election while in term {self.current_term}...")
 
@@ -122,11 +122,12 @@ class RaftServer:
     def process_command(self, command):
         if self.state == ServerState.LEADER:
             print(f"Leader {self.server_id} received command: {command}")
-            command_confirmation = 1
-            total_servers = 1
+            command_confirmation = 1 # conta as confirmações recebidas
+            total_servers = 1 # mantem o numero total de servidores
             for peer_uri in self.peers:
                 try:
                     peer = Pyro5.api.Proxy(peer_uri)
+                    # tenta estabelecer uma conexão e enviar o comando para ser anexado ao log do peer
                     if peer.append_log(self.server_id, command):
                         command_confirmation += 1
 
@@ -134,6 +135,7 @@ class RaftServer:
                 except Pyro5.errors.CommunicationError as e:
                     print(f"Failed to communicate with peer {peer_uri}: {e}")
 
+            # Verifica se a maioria dos servidores (incluindo o líder) confirmou a adição do comando ao log
             if command_confirmation > total_servers // 2:
                 for peer_uri in self.peers:
                     try:
@@ -145,32 +147,34 @@ class RaftServer:
     # Adiciona um comando ao log se o comando for de um líder reconhecido.
     def append_log(self, leader_id, command):
         if leader_id == self.leader_id:
-            self.last_command = command
+            self.last_command = command # atualiza o último comando recebido pelo seguidor com o comando recebido
             return True
         return False
 
     # Confirma os comandos no log local após a replicação bem-sucedida.
     def commit_log(self):
+        # Verifica se existe um último comando pendente para confirmação no servidor.
         if self.last_command is not None:
-            self.log.append(self.last_command)
-            self.last_command = None
+            self.log.append(self.last_command) # Adiciona o último comando ao log local do servidor
+            self.last_command = None # indicando que não há mais comandos pendentes para confirmação
             print(f"Server {self.server_id} log: {self.log}")
 
     # Reseta o timer de eleição para prevenir a ocorrência de eleições frequentes.
     def reset_election_timer(self):
-        self.election_timer.cancel()
-        self.election_timer = threading.Timer(random.uniform(5, 10), self.start_election)
-        self.election_timer.start()
+        self.election_timer.cancel() # Cancela o temporizador de eleição atual  
+        self.election_timer = threading.Timer(random.uniform(5, 10), self.start_election) # Cria um novo temporizador de eleição 
+        self.election_timer.start() # Inicia o novo temporizador de eleição
 
     # Reseta o timer de heartbeat para manter a regularidade dos envios.
     def reset_heartbeat_timer(self):
-        self.heartbeat_timer.cancel()
-        self.heartbeat_timer = threading.Timer(self.heartbeat_interval, self.send_heartbeat)
-        self.heartbeat_timer.start()
+        self.heartbeat_timer.cancel()  # Cancela o temporizador de batimento cardíaco atual
+        self.heartbeat_timer = threading.Timer(self.heartbeat_interval, self.send_heartbeat)  # Cria um novo temporizador de batimento cardíaco
+        self.heartbeat_timer.start() # nicia o novo temporizador de batimento cardíaco
 
     # nicia o loop principal do servidor, mantendo-o rodando.
     def run(self):
-        self.election_timer.start()
+        self.election_timer.start() # Inicia o temporizador de eleição
+        # controla se o servidor está em execução ou não
         while self.running:
             self.daemon.requestLoop(lambda: self.running)
 
